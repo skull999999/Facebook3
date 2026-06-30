@@ -7,7 +7,9 @@ import thefacebook.model.Role;
 import thefacebook.model.User;
 import thefacebook.service.SocialNetwork;
 
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -18,6 +20,8 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
+import java.awt.Image;
+import java.io.File;
 import java.time.LocalDate;
 import java.util.ArrayList;
 
@@ -27,6 +31,7 @@ public class TheFacebookGUI {
     private final LinkedListBrowsingHistory history = new LinkedListBrowsingHistory();
     private User currentUser;
     private JTextArea output;
+    private JLabel avatarLabel;
 
     public TheFacebookGUI(SocialNetwork network) {
         this.network = network;
@@ -80,7 +85,7 @@ public class TheFacebookGUI {
         output = new JTextArea();
         output.setEditable(false);
         output.setText(currentUser.publicProfile(network.friendCount(currentUser.getId())));
-        panel.add(new JScrollPane(output), BorderLayout.CENTER);
+        panel.add(createProfilePanel(currentUser), BorderLayout.CENTER);
 
         JPanel buttons = new JPanel(new GridLayout(5, 4));
         addButton(buttons, "My Profile", e -> showProfile());
@@ -182,6 +187,7 @@ public class TheFacebookGUI {
 
     private void showProfile() {
         history.visit("Viewed my profile");
+        updateAvatarLabel(currentUser);
         output.setText(currentUser.publicProfile(network.friendCount(currentUser.getId())));
     }
 
@@ -193,8 +199,11 @@ public class TheFacebookGUI {
         JTextField relationship = new JTextField(currentUser.getRelationshipStatus());
         JTextField hobby = new JTextField();
         JTextField career = new JTextField();
+        JTextField avatarPath = new JTextField(currentUser.getAvatarPath());
+        JButton chooseAvatar = new JButton("Choose...");
+        chooseAvatar.addActionListener(e -> chooseAvatarFile(avatarPath));
 
-        JPanel panel = new JPanel(new GridLayout(7, 2));
+        JPanel panel = new JPanel(new GridLayout(8, 2));
         panel.add(new JLabel("Name:"));
         panel.add(name);
         panel.add(new JLabel("Birthday YYYY-MM-DD:"));
@@ -209,6 +218,11 @@ public class TheFacebookGUI {
         panel.add(hobby);
         panel.add(new JLabel("Add career:"));
         panel.add(career);
+        panel.add(new JLabel("Avatar image:"));
+        JPanel avatarPanel = new JPanel(new BorderLayout());
+        avatarPanel.add(avatarPath, BorderLayout.CENTER);
+        avatarPanel.add(chooseAvatar, BorderLayout.EAST);
+        panel.add(avatarPanel);
 
         int result = JOptionPane.showConfirmDialog(frame, panel, "Edit Profile", JOptionPane.OK_CANCEL_OPTION);
         if (result != JOptionPane.OK_OPTION) {
@@ -221,6 +235,7 @@ public class TheFacebookGUI {
             currentUser.setAddress(address.getText().trim());
             currentUser.setGender(gender.getText().trim());
             currentUser.setRelationshipStatus(relationship.getText().trim());
+            currentUser.setAvatarPath(avatarPath.getText().trim());
             if (!hobby.getText().trim().isEmpty()) {
                 currentUser.getHobbies().add(hobby.getText().trim());
             }
@@ -420,7 +435,8 @@ public class TheFacebookGUI {
                     .append(user.getName()).append(" | ")
                     .append(user.getUsername()).append(" | ")
                     .append(user.getId()).append(" | ")
-                    .append(user.getEmail()).append("\n");
+                    .append(user.getEmail()).append(" | Hobbies: ")
+                    .append(formatHobbies(user)).append("\n");
         }
         text.append("\n");
     }
@@ -436,15 +452,56 @@ public class TheFacebookGUI {
                     .append(user.getName()).append(" | ")
                     .append(user.getUsername()).append(" | ")
                     .append(user.getId()).append(" | ")
-                    .append(user.getEmail()).append("\n");
+                    .append(user.getEmail()).append(" | Hobbies: ")
+                    .append(formatHobbies(user)).append("\n");
         }
         return text.toString();
+    }
+
+    private String formatHobbies(User user) {
+        if (user.getHobbies().isEmpty()) {
+            return "None";
+        }
+        return String.join(", ", user.getHobbies());
     }
 
     private void addButton(JPanel panel, String text, java.awt.event.ActionListener listener) {
         JButton button = new JButton(text);
         button.addActionListener(listener);
         panel.add(button);
+    }
+
+    private JPanel createProfilePanel(User user) {
+        JPanel profile = new JPanel(new BorderLayout());
+        avatarLabel = new JLabel("", JLabel.CENTER);
+        updateAvatarLabel(user);
+        profile.add(avatarLabel, BorderLayout.WEST);
+        profile.add(new JScrollPane(output), BorderLayout.CENTER);
+        return profile;
+    }
+
+    private void updateAvatarLabel(User user) {
+        if (avatarLabel == null) {
+            return;
+        }
+        String avatarPath = user.getAvatarPath();
+        if (avatarPath == null || avatarPath.trim().isEmpty() || !new File(avatarPath).exists()) {
+            avatarLabel.setIcon(null);
+            avatarLabel.setText("<html><center>No<br>Avatar</center></html>");
+            return;
+        }
+        ImageIcon icon = new ImageIcon(avatarPath);
+        Image scaled = icon.getImage().getScaledInstance(120, 120, Image.SCALE_SMOOTH);
+        avatarLabel.setText("");
+        avatarLabel.setIcon(new ImageIcon(scaled));
+    }
+
+    private void chooseAvatarFile(JTextField avatarPath) {
+        JFileChooser chooser = new JFileChooser();
+        int result = chooser.showOpenDialog(frame);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            avatarPath.setText(chooser.getSelectedFile().getAbsolutePath());
+        }
     }
 
     private void setPage(JPanel panel) {

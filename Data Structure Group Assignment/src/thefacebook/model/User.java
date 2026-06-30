@@ -17,6 +17,7 @@ public class User {
     private String address;
     private String gender;
     private String relationshipStatus;
+    private String avatarPath = "";
     // ArrayList is used because hobbies are ordered, displayed often, and can grow or shrink dynamically.
     private final ArrayList<String> hobbies = new ArrayList<>();
     // Stack is used because the newest occupation should appear first, matching profile browsing habits.
@@ -47,7 +48,7 @@ public class User {
 
     public String toCsv() {
         return join(id, name, username, email, phone, passwordHash, birthday.toString(), address, gender,
-                relationshipStatus, role.name(), String.join(";", hobbies), String.join(";", careerHistory));
+                relationshipStatus, role.name(), String.join(";", hobbies), String.join(";", careerHistory), avatarPath);
     }
 
     public static User fromCsv(String line) {
@@ -63,6 +64,9 @@ public class User {
             for (String career : p[12].split(";")) {
                 user.careerHistory.push(career);
             }
+        }
+        if (p.length > 13) {
+            user.avatarPath = p[13];
         }
         return user;
     }
@@ -82,6 +86,7 @@ public class User {
         return "ID: " + id + "\nName: " + name + "\nUsername: " + username + "\nGender: " + gender
                 + "\nAge: " + getAge() + "\nAddress: " + address + "\nRelationship: " + relationshipStatus
                 + "\nHobbies: " + hobbies + "\nCareer: " + careerHistory + "\nFriends: " + friendCount
+                + "\nAvatar: " + (avatarPath == null || avatarPath.isEmpty() ? "Not set" : avatarPath)
                 + "\nRole: " + role;
     }
 
@@ -114,5 +119,7 @@ public class User {
     public void setGender(String gender) { this.gender = gender; }
     public String getRelationshipStatus() { return relationshipStatus; }
     public void setRelationshipStatus(String relationshipStatus) { this.relationshipStatus = relationshipStatus; }
+    public String getAvatarPath() { return avatarPath; }
+    public void setAvatarPath(String avatarPath) { this.avatarPath = avatarPath; }
     public Role getRole() { return role; }
 }

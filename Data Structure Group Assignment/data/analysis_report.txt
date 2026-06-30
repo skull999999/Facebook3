@@ -1,12 +1,12 @@
 TheFacebook Data Analysis Report
-Generated date: 2026-06-23
-Total accounts: 32
-Normal users: 30
+Generated date: 2026-06-30
+Total accounts: 33
+Normal users: 31
 Admins: 2
-Friendship connections: 54
-Pending friend requests: 3
-Average age: 37
+Friendship connections: 55
+Pending friend requests: 4
+Average age: 36
 Gender - Male: 16
 Gender - Female: 16
-Gender - Other/Not set: 0
+Gender - Other/Not set: 1
 Actionable insight: If pending requests are high, users may need clearer request notifications.
