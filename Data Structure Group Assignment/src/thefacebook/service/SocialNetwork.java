@@ -183,11 +183,15 @@ public class SocialNetwork {
      * @return 匹配关键词的用户列表，按姓名升序排序
      */
     public ArrayList<User> searchUsers(String keyword) {
-        String lower = keyword.toLowerCase();
         ArrayList<User> result = new ArrayList<>();
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return result;
+        }
+        String lower = keyword.trim().toLowerCase();
         for (User user : usersById.values()) {
             if (contains(user.getName(), lower) || contains(user.getUsername(), lower) || contains(user.getId(), lower)
-                    || contains(user.getEmail(), lower) || contains(user.getPhone(), lower)) {
+                    || contains(user.getEmail(), lower) || contains(user.getPhone(), lower)
+                    || hasMatchingHobby(user, lower)) {
                 if (!result.contains(user)) {
                     result.add(user);
                 }
@@ -525,6 +529,15 @@ public class SocialNetwork {
         return value != null && value.toLowerCase().contains(lower);
     }
 
+    private boolean hasMatchingHobby(User user, String lower) {
+        for (String hobby : user.getHobbies()) {
+            if (contains(hobby, lower)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
@@ -669,8 +682,7 @@ public class SocialNetwork {
                     LocalDate.of(1980 + (i % 20), (i % 12) + 1, (i % 25) + 1),
                     "Harvard House " + ((i % 5) + 1), i % 2 == 0 ? "Female" : "Male",
                     i % 3 == 0 ? "In a relationship" : "Single", role);
-            user.getHobbies().add("Coding");
-            user.getHobbies().add(i % 2 == 0 ? "Music" : "Basketball");
+            addSeedHobbies(user, i);
             user.getCareerHistory().push("Student");
             addToIndexes(user);
         }
@@ -684,5 +696,16 @@ public class SocialNetwork {
         graph.addFriendship("A2", "U4");
         requests.add(new FriendRequest("U5", "U10"));
         requests.add(new FriendRequest("U8", "U10"));
+    }
+
+    private void addSeedHobbies(User user, int index) {
+        String[] hobbies = {
+                "Coding", "Music", "Basketball", "Reading", "Gaming", "Art",
+                "Photography", "Cooking", "Swimming", "Running", "Dancing", "Travel",
+                "Movies", "Chess", "Badminton", "Football", "Yoga", "Writing"
+        };
+        user.getHobbies().add(hobbies[index % hobbies.length]);
+        user.getHobbies().add(hobbies[(index + 5) % hobbies.length]);
+        user.getHobbies().add(hobbies[(index + 11) % hobbies.length]);
     }
 }

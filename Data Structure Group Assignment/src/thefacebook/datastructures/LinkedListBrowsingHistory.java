@@ -3,7 +3,17 @@ package thefacebook.datastructures;
 import java.util.LinkedList;
 
 public class LinkedListBrowsingHistory {
-    private final LinkedList<String> records = new LinkedList<>();
+    private static class HistoryRecord {
+        String title;
+        String content;
+
+        HistoryRecord(String title, String content) {
+            this.title = title;
+            this.content = content;
+        }
+    }
+
+    private final LinkedList<HistoryRecord> records = new LinkedList<>();
     private int currentIndex = -1;
 
     /**
@@ -12,10 +22,14 @@ public class LinkedListBrowsingHistory {
      * @param content 页面名称/链接 page name or url
      */
     public void visit(String content) {
+        visit(content, content);
+    }
+
+    public void visit(String title, String content) {
         while (records.size() > currentIndex + 1) {
             records.removeLast();
         }
-        records.add(content);
+        records.add(new HistoryRecord(title, content));
         currentIndex = records.size() - 1;
     }
 
@@ -35,7 +49,7 @@ public class LinkedListBrowsingHistory {
             } else {
                 text.append("   ");
             }
-            text.append(i + 1).append(". ").append(records.get(i)).append("\n");
+            text.append(i + 1).append(". ").append(records.get(i).title).append("\n");
         }
         return text.toString();
     }
@@ -50,10 +64,10 @@ public class LinkedListBrowsingHistory {
             return "No browsing history in this login session.";
         }
         if (currentIndex <= 0) {
-            return "Already at the first record: " + records.get(currentIndex);
+            return records.get(currentIndex).content;
         }
         currentIndex--;
-        return "Back to: " + records.get(currentIndex);
+        return records.get(currentIndex).content;
     }
 
     /**
@@ -66,10 +80,10 @@ public class LinkedListBrowsingHistory {
             return "No browsing history in this login session.";
         }
         if (currentIndex >= records.size() - 1) {
-            return "Already at the latest record: " + records.get(currentIndex);
+            return records.get(currentIndex).content;
         }
         currentIndex++;
-        return "Forward to: " + records.get(currentIndex);
+        return records.get(currentIndex).content;
     }
 
     public void clear() {

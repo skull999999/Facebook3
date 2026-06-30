@@ -18,10 +18,16 @@ import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.ArrayList;
 
@@ -100,11 +106,10 @@ public class TheFacebookGUI {
         addButton(buttons, "Group Chat", e -> showGroupChat());
         addButton(buttons, "Mutual Friends", e -> showMutualFriends());
         addButton(buttons, "History", e -> output.setText(history.showHistory()));
-        addButton(buttons, "Back", e -> output.setText(history.back()));
-        addButton(buttons, "Forward", e -> output.setText(history.forward()));
+        addButton(buttons, "Back", e -> restoreHistoryContent(history.back()));
+        addButton(buttons, "Forward", e -> restoreHistoryContent(history.forward()));
         addButton(buttons, "Analysis Report", e -> {
-            history.visit("Generated analysis report");
-            output.setText(network.generateAnalysisReport());
+            setOutputWithHistory("Generated analysis report", network.generateAnalysisReport());
         });
         if (currentUser.getRole() == Role.ADMIN) {
             addButton(buttons, "Delete User", e -> deleteUser());
@@ -149,8 +154,8 @@ public class TheFacebookGUI {
         } else {
             history.clear();
             currentUser = user;
-            history.visit("Logged in as " + user.getUsername());
             showHomePage();
+            history.visit("Logged in as " + user.getUsername(), currentUser.publicProfile(network.friendCount(currentUser.getId())));
         }
     }
 
@@ -186,9 +191,8 @@ public class TheFacebookGUI {
     }
 
     private void showProfile() {
-        history.visit("Viewed my profile");
         updateAvatarLabel(currentUser);
-        output.setText(currentUser.publicProfile(network.friendCount(currentUser.getId())));
+        setOutputWithHistory("Viewed my profile", currentUser.publicProfile(network.friendCount(currentUser.getId())));
     }
 
     private void editProfile() {
@@ -235,7 +239,7 @@ public class TheFacebookGUI {
             currentUser.setAddress(address.getText().trim());
             currentUser.setGender(gender.getText().trim());
             currentUser.setRelationshipStatus(relationship.getText().trim());
-            currentUser.setAvatarPath(avatarPath.getText().trim());
+            currentUser.setAvatarPath(saveAvatarFile(avatarPath.getText().trim()));
             if (!hobby.getText().trim().isEmpty()) {
                 currentUser.getHobbies().add(hobby.getText().trim());
             }
@@ -243,52 +247,52 @@ public class TheFacebookGUI {
                 currentUser.getCareerHistory().push(career.getText().trim());
             }
             network.updateUser(currentUser);
-            history.visit("Edited my profile");
             showProfile();
             message("Profile updated.");
         } catch (Exception e) {
-            message("Invalid input. Birthday must be YYYY-MM-DD.");
+            message("Invalid input. Birthday must be YYYY-MM-DD, and avatar must be a readable image.");
         }
     }
 
     private void searchUsers(boolean canAddFriend) {
-        String keyword = JOptionPane.showInputDialog(frame, "Search by name, username, ID, email, or phone:");
+        String keyword = JOptionPane.showInputDialog(frame, "Search by name, username, ID, email, phone, or hobby:");
         if (keyword == null) {
+            return;
+        }
+        if (keyword.trim().isEmpty()) {
+            message("Please enter a keyword or hobby.");
             return;
         }
 
         ArrayList<User> users = network.searchUsers(keyword.trim());
-        if (currentUser != null) {
-            history.visit("Searched users: " + keyword.trim());
-        }
-        output.setText(formatUsers(users));
+        setOutputWithOptionalHistory("Searched users: " + keyword.trim(), formatUsers(users));
 
         if (canAddFriend && !users.isEmpty()) {
             String id = JOptionPane.showInputDialog(frame, "Enter user ID to send friend request, or leave blank:");
             if (id != null && !id.trim().isEmpty()) {
                 output.append("\n" + network.sendFriendRequest(currentUser.getId(), id.trim()));
+                history.visit("Sent friend request to " + id.trim(), output.getText());
             }
         }
     }
 
     private void showRecommendations() {
-        history.visit("Viewed friend recommendations");
         ArrayList<User> users = network.friendRecommendations(currentUser.getId());
-        output.setText(formatUsers(users));
+        setOutputWithHistory("Viewed friend recommendations", formatUsers(users));
         if (users.isEmpty()) {
             return;
         }
         String id = JOptionPane.showInputDialog(frame, "Enter user ID to send friend request, or leave blank:");
         if (id != null && !id.trim().isEmpty()) {
             output.append("\n" + network.sendFriendRequest(currentUser.getId(), id.trim()));
+            history.visit("Sent friend request to " + id.trim(), output.getText());
         }
     }
 
     private void showRequests() {
-        history.visit("Viewed friend requests");
         java.util.List<FriendRequest> requests = network.requestsFor(currentUser.getId());
         if (requests.isEmpty()) {
-            output.setText("No incoming requests.");
+            setOutputWithHistory("Viewed friend requests", "No incoming requests.");
             return;
         }
 
@@ -296,7 +300,7 @@ public class TheFacebookGUI {
         for (FriendRequest request : requests) {
             text.append(request.getFromUserId()).append(" wants to add you.\n");
         }
-        output.setText(text.toString());
+        setOutputWithHistory("Viewed friend requests", text.toString());
 
         String fromId = JOptionPane.showInputDialog(frame, "Enter sender ID to respond:");
         if (fromId == null || fromId.trim().isEmpty()) {
@@ -304,20 +308,19 @@ public class TheFacebookGUI {
         }
         int choice = JOptionPane.showConfirmDialog(frame, "Accept this request?", "Friend Request", JOptionPane.YES_NO_OPTION);
         output.append("\n" + network.respondToRequest(currentUser.getId(), fromId.trim(), choice == JOptionPane.YES_OPTION));
+        history.visit("Responded to friend request from " + fromId.trim(), output.getText());
     }
 
     private void showFriends() {
-        history.visit("Viewed my friends");
-        output.setText(formatUsers(network.friendsOf(currentUser.getId())));
+        setOutputWithHistory("Viewed my friends", formatUsers(network.friendsOf(currentUser.getId())));
     }
 
     private void showDegreeFriends() {
-        history.visit("Viewed degree friends");
         StringBuilder text = new StringBuilder();
         appendDegreeUsers(text, "First-degree friends", network.connectionsAtDegree(currentUser.getId(), 1));
         appendDegreeUsers(text, "Second-degree friends", network.connectionsAtDegree(currentUser.getId(), 2));
         appendDegreeUsers(text, "Third-degree friends", network.connectionsAtDegree(currentUser.getId(), 3));
-        output.setText(text.toString());
+        setOutputWithHistory("Viewed degree friends", text.toString());
     }
 
     private void showFriendChat() {
@@ -326,14 +329,14 @@ public class TheFacebookGUI {
             return;
         }
         String cleanFriendId = friendId.trim();
-        history.visit("Opened friend chat with " + cleanFriendId);
-        output.setText(network.viewFriendConversation(currentUser.getId(), cleanFriendId));
+        setOutputWithHistory("Opened friend chat with " + cleanFriendId,
+                network.viewFriendConversation(currentUser.getId(), cleanFriendId));
 
         String messageText = JOptionPane.showInputDialog(frame, "Type a message, or leave blank to only view:");
         if (messageText != null && !messageText.trim().isEmpty()) {
             output.append("\n" + network.sendFriendMessage(currentUser.getId(), cleanFriendId, messageText));
             output.append("\n\n" + network.viewFriendConversation(currentUser.getId(), cleanFriendId));
-            history.visit("Sent friend message to " + cleanFriendId);
+            history.visit("Sent friend message to " + cleanFriendId, output.getText());
         }
     }
 
@@ -351,13 +354,13 @@ public class TheFacebookGUI {
             return;
         }
         String created = network.createGroupConversation(currentUser.getId(), groupName.getText(), splitIds(memberIds.getText()));
-        history.visit("Created group chat: " + groupName.getText().trim());
-        output.setText(created);
+        setOutputWithHistory("Created group chat: " + groupName.getText().trim(), created);
     }
 
     private void showGroupChat() {
         ArrayList<GroupConversation> groups = network.groupConversationsFor(currentUser.getId());
         output.setText(formatGroups(groups));
+        history.visit("Viewed group chats", output.getText());
         if (groups.isEmpty()) {
             return;
         }
@@ -366,14 +369,14 @@ public class TheFacebookGUI {
             return;
         }
         String cleanGroupId = groupId.trim();
-        history.visit("Opened group chat " + cleanGroupId);
-        output.setText(network.viewGroupConversation(currentUser.getId(), cleanGroupId));
+        setOutputWithHistory("Opened group chat " + cleanGroupId,
+                network.viewGroupConversation(currentUser.getId(), cleanGroupId));
 
         String messageText = JOptionPane.showInputDialog(frame, "Type a message, or leave blank to only view:");
         if (messageText != null && !messageText.trim().isEmpty()) {
             output.append("\n" + network.sendGroupMessage(currentUser.getId(), cleanGroupId, messageText));
             output.append("\n\n" + network.viewGroupConversation(currentUser.getId(), cleanGroupId));
-            history.visit("Sent group message to " + cleanGroupId);
+            history.visit("Sent group message to " + cleanGroupId, output.getText());
         }
     }
 
@@ -386,15 +389,14 @@ public class TheFacebookGUI {
         if (second == null) {
             return;
         }
-        history.visit("Viewed mutual friends for " + first.trim() + " and " + second.trim());
-        output.setText(formatUsers(network.commonFriends(first.trim(), second.trim())));
+        setOutputWithHistory("Viewed mutual friends for " + first.trim() + " and " + second.trim(),
+                formatUsers(network.commonFriends(first.trim(), second.trim())));
     }
 
     private void deleteUser() {
         String id = JOptionPane.showInputDialog(frame, "User ID to delete:");
         if (id != null && !id.trim().isEmpty()) {
-            history.visit("Deleted user " + id.trim());
-            output.setText(network.deleteUser(currentUser, id.trim()));
+            setOutputWithHistory("Deleted user " + id.trim(), network.deleteUser(currentUser, id.trim()));
         }
     }
 
@@ -465,6 +467,23 @@ public class TheFacebookGUI {
         return String.join(", ", user.getHobbies());
     }
 
+    private void setOutputWithHistory(String title, String content) {
+        output.setText(content);
+        history.visit(title, content);
+    }
+
+    private void setOutputWithOptionalHistory(String title, String content) {
+        output.setText(content);
+        if (currentUser != null) {
+            history.visit(title, content);
+        }
+    }
+
+    private void restoreHistoryContent(String content) {
+        updateAvatarLabel(currentUser);
+        output.setText(content);
+    }
+
     private void addButton(JPanel panel, String text, java.awt.event.ActionListener listener) {
         JButton button = new JButton(text);
         button.addActionListener(listener);
@@ -498,10 +517,50 @@ public class TheFacebookGUI {
 
     private void chooseAvatarFile(JTextField avatarPath) {
         JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(new FileNameExtensionFilter("Image files", "jpg", "jpeg", "png", "gif", "bmp"));
         int result = chooser.showOpenDialog(frame);
         if (result == JFileChooser.APPROVE_OPTION) {
             avatarPath.setText(chooser.getSelectedFile().getAbsolutePath());
         }
+    }
+
+    private String saveAvatarFile(String selectedPath) throws IOException {
+        if (selectedPath == null || selectedPath.trim().isEmpty()) {
+            return "";
+        }
+        Path source = Paths.get(selectedPath.trim());
+        if (!Files.exists(source)) {
+            return selectedPath.trim();
+        }
+        if (!isImageFile(source)) {
+            throw new IOException("Avatar must be an image file.");
+        }
+
+        Path avatarFolder = Paths.get("data", "avatars");
+        Files.createDirectories(avatarFolder);
+
+        Path absoluteAvatarFolder = avatarFolder.toAbsolutePath().normalize();
+        Path absoluteSource = source.toAbsolutePath().normalize();
+        if (absoluteSource.startsWith(absoluteAvatarFolder)) {
+            return absoluteSource.toString();
+        }
+
+        String fileName = source.getFileName().toString();
+        String extension = "";
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            extension = fileName.substring(dotIndex);
+        }
+        String copiedName = currentUser.getId() + "_" + System.currentTimeMillis() + extension;
+        Path target = avatarFolder.resolve(copiedName);
+        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+        return target.toAbsolutePath().normalize().toString();
+    }
+
+    private boolean isImageFile(Path path) {
+        String name = path.getFileName().toString().toLowerCase();
+        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")
+                || name.endsWith(".gif") || name.endsWith(".bmp");
     }
 
     private void setPage(JPanel panel) {
